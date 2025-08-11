@@ -1,0 +1,232 @@
+#+Title: Minimal Emacs Configuration
+#+Author: Pedro Oliveira (eval-me)
+#+Property: header-args:emacs-lisp :tangle ~/.config/emacs/init.el
+
+* Configuration DSL
+Set path Macro
+#+begin_src emacs-lisp
+  (defmacro set-path (name path)
+    `(setq ,name (expand-file-name ,path)))
+#+end_src
+
+Set Lang Macro (Uses variable langs to configure LSP and more!)
+#+begin_src emacs-lisp
+  (defmacro set-langs (langs)
+    (if (not (listp langs)) (error "The argument needs to be a list!"))
+    `(setq langs ,langs))
+#+end_src
+
+Keybind Macro
+*IMPORTANT*
+Use before Emacs 29.0.50 (Custom Macro)
+Use =keymap-set-key= after said version instead. (Native)
+#+begin_src emacs-lisp
+  (defmacro bind-key (key func)
+    `(global-set-key (kbd ,key) ,func))
+#+end_src
+
+Use Package Macro.
+#+begin_src emacs-lisp
+  (defmacro use! (package)
+    `(use-package ,package
+       :ensure t))
+#+end_src
+
+Turn a List of objects into a List of strings
+#+begin_src emacs-lisp
+  (defun to-str-list (lst)
+    (cond ((eq lst nil) nil)
+          (t (cons (prin1-to-string (car lst)) (to-str-list (cdr lst))))))
+
+  (to-str-list '(a b c de))
+#+end_src
+
+* Packages
+** Melpa Config
+#+begin_src emacs-lisp
+  (require 'package)
+
+  (setq package-archives '(("melpa" . "https://melpa.org/packages/")
+                           ("org"   . "https://orgmode.org/elpa/")
+                           ("gnu"   . "https://elpa.gnu.org/packages/")))
+
+  (package-initialize)
+
+  (unless (package-installed-p 'use-package)
+    (package-refresh-contents)
+    (package-install 'use-package))
+
+  (require 'use-package)
+
+  (setq use-package-always-ensure t)
+#+end_src
+
+** Packages to use
+Ef Themes Package.
+#+begin_src emacs-lisp
+  (use! ef-themes)
+#+end_src
+
+Dashboard Package.
+#+begin_src emacs-lisp
+  (use! dashboard)
+#+end_src
+
+LSP Mode (TODO fix language config and other stuff)
+#+begin_src emacs-lisp
+  (use-package lsp-mode
+    :ensure t
+    :hook ((python-mode . lsp)
+           (c-mode . lsp)
+           (c++-mode . lsp)
+           (java-mode . lsp))
+    :commands lsp
+    :config
+    (setq lsp-enable-snippet t)
+    (setq lsp-prefer-flymake nil))
+
+
+  (use-package lsp-ui
+    :ensure t
+    :after lsp-mode
+    :config
+    (setq lsp-ui-doc-enable t)     
+    (setq lsp-ui-sideline-enable t)
+    (setq lsp-ui-peek-enable t)    
+    (setq lsp-ui-imenu-enable t)   
+    (setq lsp-ui-flycheck-enable t))
+
+  (use-package lsp-java
+    :ensure t
+    :after lsp
+    :config
+    (add-hook 'java-mode-hook #'lsp))
+
+  (use-package dap-mode
+    :ensure t)
+
+  
+#+end_src
+
+** Package configurations
+* Settings
+** Set essential variables for the configuration
+#+begin_src emacs-lisp
+  (set-path lit-init-file "~/.config/emacs/config.org")
+  (set-path init-file "~/.config/emacs/init.el")
+  (set-path emacs-dir "~/.config/emacs/")
+  (set-langs '(c cpp python))
+#+end_src
+
+** Mode configuration.
+Disable default bar modes.
+#+begin_src emacs-lisp
+  (menu-bar-mode -1)
+  (tool-bar-mode -1)
+  (scroll-bar-mode -1)
+#+end_src
+
+Hide the splash screen please!
+#+begin_src emacs-lisp
+  (setq inhibit-splash-screen t)
+#+end_src
+
+Give me a nice cursor please!
+#+begin_src emacs-lisp
+  (setq-default cursor-type 'hbar) 
+#+end_src
+
+Enable relative line numbers.
+#+begin_src emacs-lisp
+  (setq display-line-numbers-type 'relative)
+  (global-display-line-numbers-mode 1)
+#+end_src
+
+Enable command history
+#+begin_src emacs-lisp
+  (savehist-mode 1)
+  (setq history-length 25)
+#+end_src
+
+Don't mess with my files! *IMPORTANT*
+#+begin_src emacs-lisp
+  (setq make-backup-files nil
+	auto-save-default nil)
+#+end_src
+
+Finish my... parentheses!
+#+begin_src emacs-lisp
+  (electric-pair-mode 1)
+#+end_src
+
+** Theme
+#+begin_src emacs-lisp
+  (load-theme 'ef-dream t)
+#+end_src
+
+** Org Mode
+#+begin_src emacs-lisp
+  (setq org-startup-indented t       
+      org-hide-emphasis-markers t 
+      org-hide-leading-stars t
+      org-ellipsis " 󱞣")
+#+end_src
+
+** Font
+#+begin_src emacs-lisp
+  (set-face-attribute 'default nil :font "Iosevka Nerd Font" :height 140)
+#+end_src
+
+* Functions
+Reload my Emacs config, by tangling this file and loading the tangled file.
+#+begin_src emacs-lisp
+  (defun reload-emacs ()
+    (interactive)
+    (message "Reloading Emacs...")
+    (org-babel-tangle-file lit-init-file)
+    (load-file init-file)
+    (message "Done!"))
+#+end_src
+
+Open a buffer containing this config
+#+begin_src emacs-lisp
+  (defun open-config ()
+    (interactive)
+    (find-file lit-init-file))
+#+end_src
+
+Insert a new source block in emacs!
+#+begin_src emacs-lisp
+  (defun org-insert-source (lang)
+    (interactive (list (completing-read "Choose the language: " (cons "emacs-lisp" (to-str-list langs)))))
+    (insert
+     (format "#+begin_src %s\n\n#+end_src" lang))
+    (forward-line -1))  
+#+end_src
+
+Smart Comment function
+#+begin_src emacs-lisp
+  (defun smart-comment()
+    (interactive "")
+    (if (region-active-p)
+        (comment-region (region-beginning) (region-end))
+      (comment-line 1)))
+#+end_src
+
+* Keybinds
+** Global keybinds
+#+begin_src emacs-lisp
+  (bind-key "C-c e r" 'reload-emacs)
+  (bind-key "C-c e o" 'open-config)
+  (bind-key "C-z" 'undo-only)
+  (bind-key "C-S-z" 'undo-redo)
+  (bind-key "C-c C-c" 'smart-comment) 
+#+end_src
+
+** Local Keybinds
+*** Org Mode Keybinds
+#+begin_src emacs-lisp
+  (add-hook 'org-mode-hook
+	    (lambda () (local-set-key (kbd "C-c i s") #'org-insert-source)))
+#+end_src
+
